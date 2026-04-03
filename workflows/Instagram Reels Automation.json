@@ -1,0 +1,568 @@
+{
+  "name": "Instagram Reels Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ⏰ This workflow runs daily at 8 PM.\n\n## It fetches TikTok videos → filters them → avoids duplicates → posts to Instagram Reels automatically.",
+        "height": 120,
+        "width": 1164
+      },
+      "id": "cc9a0749-9213-4705-a40a-7827085e056b",
+      "name": "Workflow Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        128,
+        -1040
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### 🎯 Calls TikTok API to fetch 20 videos based on keyword. You can change niche here.\n### 🔀 Splits videos into separate items so each video is processed individually.\n### 🎯 Filters videos:\n- Duration between 20–40 sec             You can customize this.\n### 🎲 Picks ONE random video to avoid repetition.\n### 🧹 Extracts only needed fields: video_id + video_url",
+        "height": 438,
+        "width": 1036,
+        "color": 4
+      },
+      "id": "961b8b3b-fe93-4bf3-b600-61ba5512b961",
+      "name": "TikTok API Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        144,
+        -736
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "id": "3252960d-ded7-4b37-8cde-1464902f1ecb",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        64,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://tiktok-scraper7.p.rapidapi.com/feed/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "@motivationaltrained"
+            },
+            {
+              "name": "count",
+              "value": "20"
+            },
+            {
+              "name": "region",
+              "value": "eg"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Key",
+              "value": "YOUR_API_KEY"
+            },
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "tiktok-scraper7.p.rapidapi.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1d435658-1ea3-4825-b5eb-d7492d5e4db2",
+      "name": "Tiktok API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        272,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.videos",
+        "options": {}
+      },
+      "id": "287f6279-dd54-4b01-89d1-65fb3231faa6",
+      "name": "Split Videos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.duration }}",
+              "rightValue": 40,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            },
+            {
+              "leftValue": "={{ $json.duration }}",
+              "rightValue": 20,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "#gym",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b611e796-2abd-483a-b707-3d1ae45b8c7e",
+      "name": "Filter Videos",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "keep": "={{ $input.all().randomItem() }}"
+      },
+      "id": "256b1627-3a49-4625-aae7-a2743294064a",
+      "name": "Pick Random Video",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "304ffc4d-3367-4706-8a04-f0d57bf456d6",
+      "name": "Clean Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": "YOUR_SHEET_ID",
+        "sheetName": "Sheet1",
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "video_id",
+              "lookupValue": "={{ $json.video_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "39f081cf-58bd-4486-a4b7-f2a00ac62c6e",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1264,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (items.length === 0 || Object.keys(items[0].json).length === 0) {\n  return [{ json: { isDuplicate: false } }];\n} else {\n  return [{ json: { isDuplicate: true } }];\n}"
+      },
+      "id": "26bf25ef-9147-471d-9db5-7ec2818a7ee8",
+      "name": "Duplicate Logic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isDuplicate }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5dfd40f4-9e99-46fe-bf57-94f6e16299aa",
+      "name": "Is New?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "YOUR_SHEET_ID",
+        "sheetName": "Sheet1",
+        "columns": {
+          "value": {
+            "video_id": "={{ $('Clean Data').item.json.video_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "71ea3814-d5b4-4cd3-8517-a3ec60957bf8",
+      "name": "Save Video ID",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1872,
+        -512
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e2dd1917-3fa2-4de3-a63e-f8dd9a42426b",
+      "name": "Generate Caption",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {}
+      },
+      "id": "b05bc5dd-7ea9-4149-98df-986256678cef",
+      "name": "LLM Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "node": "YOUR_INSTAGRAM_ID",
+        "edge": "media",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "video_url",
+                "value": "={{ $('Clean Data').item.json.video_url }}"
+              },
+              {
+                "name": "caption",
+                "value": "={{ $json.text }}"
+              },
+              {
+                "name": "media_type",
+                "value": "REELS"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b4e0fa35-4cd0-412b-b379-685dfb41e501",
+      "name": "Create Container",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        2368,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "id": "ac641cf3-cbb9-4cf1-8f83-33febeb6dff0",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        2528,
+        -512
+      ],
+      "webhookId": "0fcaaa0f-07d8-4aa1-a33d-f9fccae31a33"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "node": "YOUR_INSTAGRAM_ID",
+        "edge": "media_publish",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "creation_id",
+                "value": "={{ $json.id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b2a87e74-eb7a-4abd-9177-75de9319e6d2",
+      "name": "Publish Reel",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Cheek in Google Sheet if video_id is existed\n\n### 🧠 If video already exists → loop again\n### If new → continue and store video id in sheet",
+        "height": 424,
+        "width": 748,
+        "color": 6
+      },
+      "id": "eeff6751-e922-4eef-85dc-89b0f7260638",
+      "name": "Duplicate Logic Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        -736
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### Create caption by LLM Model\n\n### publich the reel on instagram",
+        "height": 504,
+        "width": 812,
+        "color": "#5A1C1C"
+      },
+      "id": "e23b4456-d9f7-41de-a417-7ed022332cc9",
+      "name": "Duplicate Logic Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2032,
+        -736
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Tiktok API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiktok API": {
+      "main": [
+        [
+          {
+            "node": "Split Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Videos": {
+      "main": [
+        [
+          {
+            "node": "Filter Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Videos": {
+      "main": [
+        [
+          {
+            "node": "Pick Random Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Random Video": {
+      "main": [
+        [
+          {
+            "node": "Clean Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Data": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Logic": {
+      "main": [
+        [
+          {
+            "node": "Is New?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New?": {
+      "main": [
+        [
+          {
+            "node": "Save Video ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tiktok API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video ID": {
+      "main": [
+        [
+          {
+            "node": "Generate Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Caption": {
+      "main": [
+        [
+          {
+            "node": "Create Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Container": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Publish Reel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Caption",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "be19018b-af72-494d-857c-cda9115208fd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ea49b237d7acc95adbb2dfb8f1e4da9c9ca17a20b27bf013a4f5bb5462606b8a"
+  },
+  "id": "wXc3qMmAg7HiRhUA",
+  "tags": []
+}
